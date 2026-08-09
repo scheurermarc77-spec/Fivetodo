@@ -1,4 +1,4 @@
-const CACHE = "fivetodo-v1";
+const CACHE = "fivetodo-v2-leon";
 const ASSETS = [
   "./",
   "./index.html",
@@ -6,8 +6,9 @@ const ASSETS = [
   "./app.js",
   "./firebase-config.js",
   "./manifest.webmanifest",
-  "./icons/icon-192.svg",
-  "./icons/icon-512.svg"
+  "./icons/apple-touch-icon.png",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", event => {
