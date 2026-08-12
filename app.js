@@ -190,7 +190,11 @@ async function start(){
   try{
     const app = initializeApp(window.FIREBASE_CONFIG);
     db = getFirestore(app);
-    activatePush(app);
+    const pushButton = document.getElementById("enablePush");
+
+if (pushButton) {
+  pushButton.addEventListener("click", () => activatePush(app));
+}
     setStatus("","Verbinde…");
 
     for(const info of getDayInfo()){
