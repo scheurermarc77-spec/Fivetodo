@@ -88,7 +88,7 @@ function showBravo(){
   bravoTimer = setTimeout(() => {
     bravoEl.classList.remove("show");
     bravoEl.setAttribute("aria-hidden","true");
-  }, 3000);
+  }, 500);
 }
 
 function showNewTasksBanner(count){

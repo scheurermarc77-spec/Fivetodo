@@ -34,3 +34,8 @@ Wichtig:
 ## Korrektur v2
 Die Neue-Aufgaben-Erkennung wird nun auch ausgeführt, wenn FiveTodo auf dem iPhone nur aus dem Hintergrund
 wieder geöffnet wird. Ein kompletter Neustart der PWA ist nicht mehr nötig.
+
+
+## Anpassung v3
+- Neue Aufgaben werden deutlich auffälliger markiert: kräftiger Rahmen, stärkeres NEU-Label und dezente Puls-Animation.
+- Das BRAVO wird nur noch 0.5 Sekunden angezeigt.

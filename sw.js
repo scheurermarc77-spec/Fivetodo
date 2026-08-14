@@ -1,4 +1,4 @@
-const CACHE = "fivetodo-v5-new-indicator-resume";
+const CACHE = "fivetodo-v6-new-strong-bravo-fast";
 const ASSETS = [
   "./icons/leon-512-v3.png",
   "./icons/leon-192-v3.png",
