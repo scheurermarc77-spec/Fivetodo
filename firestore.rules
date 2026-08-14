@@ -1,18 +1,8 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
     match /days/{dayId} {
       allow read, write: if true;
-    }
-
-    match /pushTokens/{tokenId} {
-      allow create, update: if
-        tokenId == request.resource.data.token
-        && request.resource.data.keys().hasOnly(['token', 'updatedAt']);
-
-      allow read, delete: if false;
     }
   }
 }

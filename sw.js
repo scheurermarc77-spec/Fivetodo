@@ -21,7 +21,9 @@ self.addEventListener("install", event => {
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    caches.keys().then(keys =>
+      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
+    )
   );
   self.clients.claim();
 });
@@ -30,46 +32,5 @@ self.addEventListener("fetch", event => {
   if(event.request.method !== "GET") return;
   event.respondWith(
     caches.match(event.request).then(cached => cached || fetch(event.request))
-  );
-});
-self.addEventListener("push", event => {
-  let payload = {};
-
-  try {
-    payload = event.data ? event.data.json() : {};
-  } catch {
-    payload = {};
-  }
-
-  const notification = payload.notification || {};
-  const data = payload.data || {};
-
-  const title = notification.title || data.title || "FiveTodo";
-  const body =
-    notification.body ||
-    data.body ||
-    "In FiveTodo gibt es eine neue Änderung.";
-
-  event.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon: "./icons/leon-192-v3.png",
-      badge: "./icons/leon-192-v3.png",
-      data: {
-        url: data.url || self.registration.scope
-      }
-    })
-  );
-});
-
-self.addEventListener("notificationclick", event => {
-  event.notification.close();
-
-  const url =
-    event.notification.data?.url ||
-    self.registration.scope;
-
-  event.waitUntil(
-    clients.openWindow(url)
   );
 });

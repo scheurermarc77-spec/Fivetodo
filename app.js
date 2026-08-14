@@ -1,5 +1,4 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-app.js";
-import { getMessaging, getToken } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-messaging.js";
 import {
   getFirestore,
   doc,
@@ -174,7 +173,9 @@ function bindInputs(){
 
 function firebaseLooksConfigured(){
   const c = window.FIREBASE_CONFIG;
-  return c && Object.values(c).every(v => typeof v === "string" && v && !v.includes("HIER_EINTRAGEN"));
+  return c && Object.values(c).every(v =>
+    typeof v === "string" && v && !v.includes("HIER_EINTRAGEN")
+  );
 }
 
 async function start(){
@@ -190,11 +191,6 @@ async function start(){
   try{
     const app = initializeApp(window.FIREBASE_CONFIG);
     db = getFirestore(app);
-    const pushButton = document.getElementById("enablePush");
-
-if (pushButton) {
-  pushButton.addEventListener("click", () => activatePush(app));
-}
     setStatus("","Verbinde…");
 
     for(const info of getDayInfo()){
@@ -215,35 +211,5 @@ if (pushButton) {
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
 }
-async function activatePush(app) {
-  try {
-    if (!("Notification" in window)) return;
-    if (!("serviceWorker" in navigator)) return;
 
-    const permission = await Notification.requestPermission();
-    if (permission !== "granted") return;
-
-    const registration = await navigator.serviceWorker.ready;
-    const messaging = getMessaging(app);
-
-    const token = await getToken(messaging, {
-      vapidKey: "BA7TSD9LYZvga-LrkhFllt8PMidMISiexgoRshi3KXD29YajZTvi-dzlYAUrDcsfBSHKU8bhG7tPPZ5hlF6URbw",
-      serviceWorkerRegistration: registration
-    });
-
-    if (token) {
-      await setDoc(
-        doc(db, "pushTokens", token),
-        {
-          token: token,
-          updatedAt: new Date().toISOString()
-        },
-        { merge: true }
-      );
-      console.log("Push aktiviert");
-    }
-  } catch (err) {
-    console.error("Push-Fehler:", err);
-  }
-}
 start();
