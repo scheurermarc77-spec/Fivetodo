@@ -39,3 +39,11 @@ wieder geöffnet wird. Ein kompletter Neustart der PWA ist nicht mehr nötig.
 ## Anpassung v3
 - Neue Aufgaben werden deutlich auffälliger markiert: kräftiger Rahmen, stärkeres NEU-Label und dezente Puls-Animation.
 - Das BRAVO wird nur noch 0.5 Sekunden angezeigt.
+
+
+## Anpassung v4
+- Vorgestern entfernt.
+- Standardreihenfolge: Heute, Morgen, Übermorgen.
+- Bei Heute gibt es einen Button „← Gestern“, der die gestrige Liste ein-/ausblendet.
+- Neue Aufgaben erhalten einen deutlich sichtbaren roten Rahmen und ein rotes „NEU“-Label.
+- BRAVO leuchtet nur noch ganz kurz auf (ca. 0,18 Sekunden).

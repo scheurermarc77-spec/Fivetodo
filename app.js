@@ -14,11 +14,10 @@ const newTasksBanner = document.getElementById("newTasksBanner");
 const newTasksText = document.getElementById("newTasksText");
 
 const DAY_SPECS = [
-  { offset: -2, label: "Vorgestern" },
-  { offset: -1, label: "Gestern" },
   { offset: 0, label: "Heute" },
   { offset: 1, label: "Morgen" },
-  { offset: 2, label: "Übermorgen" }
+  { offset: 2, label: "Übermorgen" },
+  { offset: -1, label: "Gestern", hidden: true }
 ];
 
 const LAST_SEEN_KEY = "fivetodo_last_seen_at_v2";
@@ -88,7 +87,7 @@ function showBravo(){
   bravoTimer = setTimeout(() => {
     bravoEl.classList.remove("show");
     bravoEl.setAttribute("aria-hidden","true");
-  }, 500);
+  }, 180);
 }
 
 function showNewTasksBanner(count){
@@ -111,6 +110,16 @@ function renderShell(){
     const card = document.createElement("section");
     card.className = "day-card";
     card.dataset.date = info.key;
+    card.dataset.label = info.label;
+
+    if(info.hidden){
+      card.classList.add("yesterday-card");
+      card.hidden = true;
+    }
+
+    const yesterdayButton = info.label === "Heute"
+      ? `<button id="showYesterday" class="yesterday-button" type="button">← Gestern</button>`
+      : "";
 
     card.innerHTML = `
       <div class="day-head">
@@ -118,7 +127,10 @@ function renderShell(){
           <span class="day-label">${info.label}</span>
           <span class="day-date">${formatDate(info.date)}</span>
         </div>
-        <span class="day-count" id="count-${info.key}">0/10</span>
+        <div class="day-head-actions">
+          ${yesterdayButton}
+          <span class="day-count" id="count-${info.key}">0/10</span>
+        </div>
       </div>
       <div class="todo-list">
         ${Array.from({length:10}, (_, i) => `
@@ -131,6 +143,23 @@ function renderShell(){
     `;
 
     daysEl.appendChild(card);
+  }
+
+  const yesterdayButton = document.getElementById("showYesterday");
+  const yesterdayCard = document.querySelector(".yesterday-card");
+
+  if(yesterdayButton && yesterdayCard){
+    yesterdayButton.addEventListener("click", () => {
+      const willShow = yesterdayCard.hidden;
+      yesterdayCard.hidden = !willShow;
+      yesterdayButton.textContent = willShow ? "↑ Gestern schliessen" : "← Gestern";
+
+      if(willShow){
+        setTimeout(() => {
+          yesterdayCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        }, 40);
+      }
+    });
   }
 }
 
