@@ -29,3 +29,8 @@ Wird danach auf einem anderen Gerät eine neue Aufgabe eingetragen:
 Wichtig:
 - Nur Aufgaben, die mit dieser neuen Version erstellt werden, besitzen einen Erstellzeitpunkt.
 - Bereits bestehende alte Aufgaben werden beim ersten Start nicht fälschlich als neu markiert.
+
+
+## Korrektur v2
+Die Neue-Aufgaben-Erkennung wird nun auch ausgeführt, wenn FiveTodo auf dem iPhone nur aus dem Hintergrund
+wieder geöffnet wird. Ein kompletter Neustart der PWA ist nicht mehr nötig.

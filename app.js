@@ -21,18 +21,14 @@ const DAY_SPECS = [
   { offset: 2, label: "Übermorgen" }
 ];
 
+const LAST_SEEN_KEY = "fivetodo_last_seen_at_v2";
+
 let db = null;
 let saveTimers = new Map();
 let bravoTimer = null;
-
-// Zeitpunkt des letzten Besuchs auf genau diesem iPhone.
-const LAST_SEEN_KEY = "fivetodo_last_seen_at_v1";
-const previousLastSeenAt = Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
-const sessionOpenedAt = Date.now();
-
-let initialSnapshotsRemaining = DAY_SPECS.length;
-let initialNewCount = 0;
-const initialNewKeys = new Set();
+let latestTodosByDay = new Map();
+let appVisibleSince = Date.now();
+let initialized = false;
 
 function isoDateLocal(d){
   const y = d.getFullYear();
@@ -71,6 +67,7 @@ function emptyTodos(){
 function normalizeTodos(raw){
   const base = emptyTodos();
   if(!Array.isArray(raw)) return base;
+
   return base.map((item, i) => ({
     text: typeof raw[i]?.text === "string" ? raw[i].text : "",
     done: !!raw[i]?.done,
@@ -87,6 +84,7 @@ function showBravo(){
   clearTimeout(bravoTimer);
   bravoEl.classList.add("show");
   bravoEl.setAttribute("aria-hidden","false");
+
   bravoTimer = setTimeout(() => {
     bravoEl.classList.remove("show");
     bravoEl.setAttribute("aria-hidden","true");
@@ -98,18 +96,22 @@ function showNewTasksBanner(count){
     newTasksBanner.hidden = true;
     return;
   }
+
   newTasksText.textContent = count === 1
     ? "1 neue Aufgabe seit deinem letzten Besuch"
     : `${count} neue Aufgaben seit deinem letzten Besuch`;
+
   newTasksBanner.hidden = false;
 }
 
 function renderShell(){
   daysEl.innerHTML = "";
+
   for(const info of getDayInfo()){
     const card = document.createElement("section");
     card.className = "day-card";
     card.dataset.date = info.key;
+
     card.innerHTML = `
       <div class="day-head">
         <div class="day-title-wrap">
@@ -127,17 +129,51 @@ function renderShell(){
         `).join("")}
       </div>
     `;
+
     daysEl.appendChild(card);
   }
 }
 
-function isNewForThisVisit(todo){
-  return !!todo.text &&
-    todo.createdAt > 0 &&
-    todo.createdAt > previousLastSeenAt;
+function readLastSeen(){
+  return Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
 }
 
-function applyTodos(dateKey, todos, collectInitialNew=false){
+function markCurrentMomentSeen(){
+  localStorage.setItem(LAST_SEEN_KEY, String(Date.now()));
+}
+
+function getNewTaskKeysSince(lastSeen){
+  const keys = [];
+
+  for(const [dateKey, todos] of latestTodosByDay.entries()){
+    const norm = normalizeTodos(todos);
+
+    norm.forEach((todo, index) => {
+      if(todo.text && todo.createdAt > 0 && todo.createdAt > lastSeen){
+        keys.push(`${dateKey}:${index}`);
+      }
+    });
+  }
+
+  return new Set(keys);
+}
+
+function refreshNewIndicators(){
+  if(!initialized) return;
+
+  const lastSeen = readLastSeen();
+  const newKeys = getNewTaskKeysSince(lastSeen);
+
+  document.querySelectorAll(".todo-row").forEach(row => {
+    const card = row.closest(".day-card");
+    const key = `${card.dataset.date}:${row.dataset.index}`;
+    row.classList.toggle("is-new", newKeys.has(key));
+  });
+
+  showNewTasksBanner(newKeys.size);
+}
+
+function applyTodos(dateKey, todos){
   const card = document.querySelector(`[data-date="${dateKey}"]`);
   if(!card) return;
 
@@ -153,47 +189,27 @@ function applyTodos(dateKey, todos, collectInitialNew=false){
     }
 
     check.checked = todo.done;
+    row.dataset.createdAt = String(todo.createdAt || 0);
     row.classList.toggle("done", todo.done);
-
-    const newKey = `${dateKey}:${i}`;
-    const isNew = isNewForThisVisit(todo);
-
-    row.classList.toggle("is-new", isNew);
-
-    if(collectInitialNew && isNew && !initialNewKeys.has(newKey)){
-      initialNewKeys.add(newKey);
-      initialNewCount++;
-    }
   });
 
   const doneCount = norm.filter(t => t.done).length;
   const count = document.getElementById(`count-${dateKey}`);
-  if(count) count.textContent = `${doneCount}/10`;
+
+  if(count){
+    count.textContent = `${doneCount}/10`;
+  }
 }
 
 function readCardTodos(dateKey){
   const card = document.querySelector(`[data-date="${dateKey}"]`);
   if(!card) return emptyTodos();
 
-  return [...card.querySelectorAll(".todo-row")].map(row => {
-    const input = row.querySelector(".todo-input");
-    const check = row.querySelector(".check");
-    return {
-      text: input.value.trimEnd(),
-      done: check.checked,
-      createdAt: Number(row.dataset.createdAt || 0)
-    };
-  });
-}
-
-function hydrateCreatedAtIntoRows(dateKey, todos){
-  const card = document.querySelector(`[data-date="${dateKey}"]`);
-  if(!card) return;
-  const norm = normalizeTodos(todos);
-  norm.forEach((todo, i) => {
-    const row = card.querySelector(`[data-index="${i}"]`);
-    if(row) row.dataset.createdAt = String(todo.createdAt || 0);
-  });
+  return [...card.querySelectorAll(".todo-row")].map(row => ({
+    text: row.querySelector(".todo-input").value.trimEnd(),
+    done: row.querySelector(".check").checked,
+    createdAt: Number(row.dataset.createdAt || 0)
+  }));
 }
 
 function queueSave(dateKey, delay=220){
@@ -203,12 +219,15 @@ function queueSave(dateKey, delay=220){
 
 async function saveDay(dateKey){
   if(!db) return;
+
   try{
     const todos = readCardTodos(dateKey);
+
     await setDoc(doc(db, "days", dateKey), {
       todos,
       updatedAt: Date.now()
     }, {merge:true});
+
     setStatus("online","Live");
   }catch(err){
     console.error(err);
@@ -223,13 +242,11 @@ function bindInputs(){
     const row = e.target.closest(".todo-row");
     const card = e.target.closest(".day-card");
 
-    // Wird aus einem leeren Todo erstmals ein echtes Todo, erhält es einen Erstellzeitpunkt.
     if(e.target.value.trim() && Number(row.dataset.createdAt || 0) === 0){
       row.dataset.createdAt = String(Date.now());
     }
 
-    // Wird ein noch nicht gespeichertes Todo wieder komplett geleert, Zeitstempel zurücksetzen.
-    if(!e.target.value.trim() && !e.target.dataset.wasSaved){
+    if(!e.target.value.trim()){
       row.dataset.createdAt = "0";
     }
 
@@ -241,76 +258,105 @@ function bindInputs(){
 
     const row = e.target.closest(".todo-row");
     const card = e.target.closest(".day-card");
+
     row.classList.toggle("done", e.target.checked);
+    queueSave(card.dataset.date, 0);
 
-    const dateKey = card.dataset.date;
-    applyTodos(dateKey, readCardTodos(dateKey));
-    queueSave(dateKey, 0);
-
-    if(e.target.checked) showBravo();
+    if(e.target.checked){
+      showBravo();
+    }
   });
 }
 
 function firebaseLooksConfigured(){
   const c = window.FIREBASE_CONFIG;
+
   return c && Object.values(c).every(v =>
-    typeof v === "string" && v && !v.includes("HIER_EINTRAGEN")
+    typeof v === "string" &&
+    v &&
+    !v.includes("HIER_EINTRAGEN")
   );
 }
 
-function finishInitialNewCheck(){
-  showNewTasksBanner(initialNewCount);
+function setupResumeDetection(){
+  document.addEventListener("visibilitychange", () => {
+    if(document.visibilityState === "hidden"){
+      // Zeitpunkt merken, an dem der Nutzer FiveTodo verlassen hat.
+      markCurrentMomentSeen();
+      return;
+    }
 
-  // Nach dem Laden gilt alles bis zu diesem Öffnen als gesehen.
-  // Eine während derselben Sitzung neu eingetragene Aufgabe wird weiterhin live markiert,
-  // beim nächsten Öffnen aber nicht noch einmal als "neu seit letztem Besuch" gezählt.
-  localStorage.setItem(LAST_SEEN_KEY, String(sessionOpenedAt));
+    if(document.visibilityState === "visible"){
+      appVisibleSince = Date.now();
+
+      // Firestore liefert ohnehin den aktuellen Stand live.
+      // Kurz warten, damit ein eventuell neuer Snapshot zuerst ankommt.
+      setTimeout(() => {
+        refreshNewIndicators();
+      }, 350);
+    }
+  });
+
+  window.addEventListener("pageshow", () => {
+    setTimeout(() => {
+      refreshNewIndicators();
+    }, 350);
+  });
 }
 
 async function start(){
   renderShell();
   bindInputs();
+  setupResumeDetection();
 
   if(!firebaseLooksConfigured()){
     setStatus("offline","Firebase fehlt");
-    for(const info of getDayInfo()) applyTodos(info.key, emptyTodos());
     return;
   }
 
   try{
     const app = initializeApp(window.FIREBASE_CONFIG);
     db = getFirestore(app);
+
     setStatus("","Verbinde…");
 
+    let firstSnapshotsLeft = DAY_SPECS.length;
+
     for(const info of getDayInfo()){
-      let firstSnapshot = true;
-
       onSnapshot(doc(db, "days", info.key), snap => {
-        const todos = snap.exists() ? snap.data().todos : emptyTodos();
+        const todos = snap.exists()
+          ? snap.data().todos
+          : emptyTodos();
 
-        hydrateCreatedAtIntoRows(info.key, todos);
-        applyTodos(info.key, todos, firstSnapshot);
+        latestTodosByDay.set(info.key, todos);
+        applyTodos(info.key, todos);
 
         setStatus("online","Live");
 
-        if(firstSnapshot){
-          firstSnapshot = false;
-          initialSnapshotsRemaining--;
-          if(initialSnapshotsRemaining === 0){
-            finishInitialNewCheck();
+        if(firstSnapshotsLeft > 0){
+          firstSnapshotsLeft--;
+
+          if(firstSnapshotsLeft === 0){
+            initialized = true;
+
+            // Beim allerersten Start auf diesem Gerät alte Aufgaben nicht als neu markieren.
+            if(readLastSeen() === 0){
+              markCurrentMomentSeen();
+              showNewTasksBanner(0);
+            }else{
+              refreshNewIndicators();
+            }
+          }
+        }else{
+          // Kommt während einer sichtbaren Sitzung eine neue Aufgabe rein,
+          // markieren wir sie ebenfalls sofort.
+          if(document.visibilityState === "visible"){
+            refreshNewIndicators();
           }
         }
       }, err => {
         console.error(err);
         setStatus("offline","Offline");
-
-        if(firstSnapshot){
-          firstSnapshot = false;
-          initialSnapshotsRemaining--;
-          if(initialSnapshotsRemaining === 0){
-            finishInitialNewCheck();
-          }
-        }
       });
     }
   }catch(err){
@@ -320,7 +366,9 @@ async function start(){
 }
 
 if("serviceWorker" in navigator){
-  window.addEventListener("load", () => navigator.serviceWorker.register("./sw.js"));
+  window.addEventListener("load", () =>
+    navigator.serviceWorker.register("./sw.js")
+  );
 }
 
 start();
