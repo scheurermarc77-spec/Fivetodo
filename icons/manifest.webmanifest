@@ -1,0 +1,22 @@
+{
+  "name": "FiveTodo – Gemeinsame To-do-App",
+  "short_name": "FiveTodo",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0b1020",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "./icons/leon-anouk-at-work-192-v4.png?v=20260815-1707",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/leon-anouk-at-work-512-v4.png?v=20260815-1707",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
