@@ -117,8 +117,8 @@ function showBravo(){
       ? `Gut gemacht, ${currentAuthor}!`
       : "Gut gemacht!";
   }
-  bravo.classList.add("show");
-  bravo.setAttribute("aria-hidden","false");
+  bravoEl.classList.add("show");
+  bravoEl.setAttribute("aria-hidden","false");
 }
 
 function showNewTasksBanner(count){
@@ -527,9 +527,9 @@ document.querySelectorAll("[data-author]").forEach(button => {
 
 ensureAuthor();
 
-bravo.addEventListener("click", () => {
-  bravo.classList.remove("show");
-  bravo.setAttribute("aria-hidden","true");
+bravoEl.addEventListener("click", () => {
+  bravoEl.classList.remove("show");
+  bravoEl.setAttribute("aria-hidden","true");
 });
 
 document.querySelectorAll("[data-profile]").forEach(button => {

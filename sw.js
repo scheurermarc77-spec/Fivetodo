@@ -1,4 +1,4 @@
-const CACHE = "fivetodo-v17-bravo-tap";
+const CACHE = "fivetodo-v18-bravo-dismiss-fix";
 const ASSETS = [
   "./",
   "./index.html",

@@ -483,3 +483,11 @@ body.profile-anouk .eyebrow{color:#f9a8d4}
   letter-spacing:.04em;
   opacity:.55;
 }
+
+.bravo.show{
+  pointer-events:auto !important;
+  cursor:pointer;
+}
+.bravo-card{
+  pointer-events:auto;
+}
