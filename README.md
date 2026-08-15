@@ -47,3 +47,11 @@ wieder geöffnet wird. Ein kompletter Neustart der PWA ist nicht mehr nötig.
 - Bei Heute gibt es einen Button „← Gestern“, der die gestrige Liste ein-/ausblendet.
 - Neue Aufgaben erhalten einen deutlich sichtbaren roten Rahmen und ein rotes „NEU“-Label.
 - BRAVO leuchtet nur noch ganz kurz auf (ca. 0,18 Sekunden).
+
+
+## Leon / Anouk
+Beim Start erscheint eine Personenauswahl.
+
+- Leon verwendet weiterhin die bestehende Sammlung `days`.
+- Anouk verwendet die neue, getrennte Sammlung `anoukDays`.
+- Über „Wechseln“ gelangt man jederzeit zurück zur Auswahl.

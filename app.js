@@ -12,6 +12,11 @@ const statusEl = document.getElementById("status");
 const statusText = document.getElementById("statusText");
 const newTasksBanner = document.getElementById("newTasksBanner");
 const newTasksText = document.getElementById("newTasksText");
+const profileChooser = document.getElementById("profileChooser");
+const appView = document.getElementById("appView");
+const changeProfileBtn = document.getElementById("changeProfile");
+const appTitle = document.getElementById("appTitle");
+const profileEyebrow = document.getElementById("profileEyebrow");
 
 const DAY_SPECS = [
   { offset: 0, label: "Heute" },
@@ -20,7 +25,15 @@ const DAY_SPECS = [
   { offset: -1, label: "Gestern", hidden: true }
 ];
 
-const LAST_SEEN_KEY = "fivetodo_last_seen_at_v2";
+let currentProfile = null;
+
+function lastSeenKey(){
+  return `fivetodo_last_seen_at_v3_${currentProfile || "none"}`;
+}
+
+function collectionName(){
+  return currentProfile === "anouk" ? "anoukDays" : "days";
+}
 
 let db = null;
 let saveTimers = new Map();
@@ -164,11 +177,11 @@ function renderShell(){
 }
 
 function readLastSeen(){
-  return Number(localStorage.getItem(LAST_SEEN_KEY) || 0);
+  return Number(localStorage.getItem(lastSeenKey()) || 0);
 }
 
 function markCurrentMomentSeen(){
-  localStorage.setItem(LAST_SEEN_KEY, String(Date.now()));
+  localStorage.setItem(lastSeenKey(), String(Date.now()));
 }
 
 function getNewTaskKeysSince(lastSeen){
@@ -252,7 +265,7 @@ async function saveDay(dateKey){
   try{
     const todos = readCardTodos(dateKey);
 
-    await setDoc(doc(db, "days", dateKey), {
+    await setDoc(doc(db, collectionName(), dateKey), {
       todos,
       updatedAt: Date.now()
     }, {merge:true});
@@ -352,7 +365,7 @@ async function start(){
     let firstSnapshotsLeft = DAY_SPECS.length;
 
     for(const info of getDayInfo()){
-      onSnapshot(doc(db, "days", info.key), snap => {
+      onSnapshot(doc(db, collectionName(), info.key), snap => {
         const todos = snap.exists()
           ? snap.data().todos
           : emptyTodos();
@@ -400,4 +413,36 @@ if("serviceWorker" in navigator){
   );
 }
 
-start();
+function resetForProfile(){
+  latestTodosByDay = new Map();
+  initialized = false;
+  saveTimers = new Map();
+  newTasksBanner.hidden = true;
+  daysEl.innerHTML = "";
+}
+
+function chooseProfile(profile){
+  currentProfile = profile;
+  resetForProfile();
+
+  document.body.classList.toggle("profile-anouk", profile === "anouk");
+  profileChooser.hidden = true;
+  appView.hidden = false;
+
+  const name = profile === "anouk" ? "Anouk" : "Leon";
+  appTitle.textContent = `FiveTodo · ${name}`;
+  profileEyebrow.textContent = profile === "anouk" ? "ANOUK · LIVE" : "LEON · LIVE";
+
+  start();
+}
+
+document.querySelectorAll("[data-profile]").forEach(button => {
+  button.addEventListener("click", () => chooseProfile(button.dataset.profile));
+});
+
+changeProfileBtn.addEventListener("click", () => {
+  currentProfile = null;
+  appView.hidden = true;
+  profileChooser.hidden = false;
+  document.body.classList.remove("profile-anouk");
+});

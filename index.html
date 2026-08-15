@@ -13,14 +13,45 @@
   <title>FiveTodo</title>
 </head>
 <body>
-  <div class="app-shell">
+  <div id="profileChooser" class="profile-chooser">
+    <div class="profile-card">
+      <div class="profile-eyebrow">FIVETODO</div>
+      <h1>Für wen?</h1>
+      <p>Wähle deine Aufgabenliste.</p>
+
+      <div class="profile-buttons">
+        <button class="profile-button leon" type="button" data-profile="leon">
+          <span class="profile-avatar">L</span>
+          <span>
+            <strong>Leon</strong>
+            <small>Meine Aufgaben</small>
+          </span>
+          <span class="profile-arrow">›</span>
+        </button>
+
+        <button class="profile-button anouk" type="button" data-profile="anouk">
+          <span class="profile-avatar">A</span>
+          <span>
+            <strong>Anouk</strong>
+            <small>Meine Aufgaben</small>
+          </span>
+          <span class="profile-arrow">›</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="appView" class="app-shell" hidden>
     <header class="topbar">
       <div>
-        <div class="eyebrow">GEMEINSAM · LIVE</div>
-        <h1>FiveTodo</h1>
+        <div class="eyebrow" id="profileEyebrow">GEMEINSAM · LIVE</div>
+        <h1 id="appTitle">FiveTodo</h1>
       </div>
-      <div class="status" id="status">
-        <span class="dot"></span><span id="statusText">Verbinde…</span>
+      <div class="topbar-actions">
+        <button id="changeProfile" class="change-profile" type="button">Wechseln</button>
+        <div class="status" id="status">
+          <span class="dot"></span><span id="statusText">Verbinde…</span>
+        </div>
       </div>
     </header>
 
