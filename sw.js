@@ -1,36 +1,15 @@
-const CACHE = "fivetodo-v11-icon-fix";
+const CACHE = "fivetodo-v11-leon-anouk-at-work-20260815";
 const ASSETS = [
-  "./icons/leon-512-v3.png",
-  "./icons/leon-192-v3.png",
-  "./icons/leon-apple-180-v3.png",
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
   "./firebase-config.js",
   "./manifest.webmanifest",
-  "./icons/apple-touch-icon.png",
-  "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/leon-anouk-at-work-180-v4.png",
+  "./icons/leon-anouk-at-work-192-v4.png",
+  "./icons/leon-anouk-at-work-512-v4.png"
 ];
-
-self.addEventListener("install", event => {
-  event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
-  self.skipWaiting();
-});
-
-self.addEventListener("activate", event => {
-  event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
-
-self.addEventListener("fetch", event => {
-  if(event.request.method !== "GET") return;
-  event.respondWith(
-    caches.match(event.request).then(cached => cached || fetch(event.request))
-  );
-});
+self.addEventListener("install", e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
+self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
+self.addEventListener("fetch", e => { if(e.request.method !== "GET") return; e.respondWith(fetch(e.request).catch(() => caches.match(e.request))); });
