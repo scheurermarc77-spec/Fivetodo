@@ -428,6 +428,7 @@ function chooseProfile(profile){
   document.body.classList.toggle("profile-anouk", profile === "anouk");
   profileChooser.hidden = true;
   appView.hidden = false;
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
   const name = profile === "anouk" ? "Anouk" : "Leon";
   appTitle.textContent = `FiveTodo · ${name}`;
@@ -444,5 +445,6 @@ changeProfileBtn.addEventListener("click", () => {
   currentProfile = null;
   appView.hidden = true;
   profileChooser.hidden = false;
+  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
   document.body.classList.remove("profile-anouk");
 });

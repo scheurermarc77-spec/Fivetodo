@@ -393,3 +393,17 @@ h1{
   font-weight:800;
 }
 body.profile-anouk .eyebrow{color:#f9a8d4}
+
+
+/* KORREKTUR: Auswahl nach Personenwahl vollständig ausblenden */
+.profile-chooser[hidden],
+.app-shell[hidden] {
+  display: none !important;
+}
+
+/* Gewählte Liste beginnt direkt ganz oben */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-top: max(16px, env(safe-area-inset-top));
+}
