@@ -55,3 +55,12 @@ Beim Start erscheint eine Personenauswahl.
 - Leon verwendet weiterhin die bestehende Sammlung `days`.
 - Anouk verwendet die neue, getrennte Sammlung `anoukDays`.
 - Über „Wechseln“ gelangt man jederzeit zurück zur Auswahl.
+
+
+## Finale Leon-/Anouk-Speicherung
+Leon und Anouk verwenden beide die bereits funktionierende Firestore-Sammlung `days`.
+
+- Leon: Dokumente wie `2026-08-15`
+- Anouk: Dokumente wie `anouk_2026-08-15`
+
+Damit bleiben die Daten getrennt, ohne neue Firebase-Regeln.

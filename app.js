@@ -32,10 +32,17 @@ function lastSeenKey(){
 }
 
 function collectionName(){
-  return currentProfile === "anouk" ? "anoukDays" : "days";
+  return "days";
+}
+
+function profileDayKey(dateKey){
+  return currentProfile === "anouk" ? `anouk_${dateKey}` : dateKey;
 }
 
 let db = null;
+let firebaseApp = null;
+let activeUnsubscribes = [];
+let resumeDetectionReady = false;
 let saveTimers = new Map();
 let bravoTimer = null;
 let latestTodosByDay = new Map();
@@ -265,7 +272,7 @@ async function saveDay(dateKey){
   try{
     const todos = readCardTodos(dateKey);
 
-    await setDoc(doc(db, collectionName(), dateKey), {
+    await setDoc(doc(db, collectionName(), profileDayKey(dateKey)), {
       todos,
       updatedAt: Date.now()
     }, {merge:true});
@@ -321,6 +328,9 @@ function firebaseLooksConfigured(){
 }
 
 function setupResumeDetection(){
+  if(resumeDetectionReady) return;
+  resumeDetectionReady = true;
+
   document.addEventListener("visibilitychange", () => {
     if(document.visibilityState === "hidden"){
       // Zeitpunkt merken, an dem der Nutzer FiveTodo verlassen hat.
@@ -357,15 +367,17 @@ async function start(){
   }
 
   try{
-    const app = initializeApp(window.FIREBASE_CONFIG);
-    db = getFirestore(app);
+    if(!firebaseApp){
+      firebaseApp = initializeApp(window.FIREBASE_CONFIG);
+    }
+    db = getFirestore(firebaseApp);
 
     setStatus("","Verbinde…");
 
     let firstSnapshotsLeft = DAY_SPECS.length;
 
     for(const info of getDayInfo()){
-      onSnapshot(doc(db, collectionName(), info.key), snap => {
+      const unsubscribe = onSnapshot(doc(db, collectionName(), profileDayKey(info.key)), snap => {
         const todos = snap.exists()
           ? snap.data().todos
           : emptyTodos();
@@ -400,6 +412,8 @@ async function start(){
         console.error(err);
         setStatus("offline","Offline");
       });
+
+      activeUnsubscribes.push(unsubscribe);
     }
   }catch(err){
     console.error(err);
@@ -414,8 +428,14 @@ if("serviceWorker" in navigator){
 }
 
 function resetForProfile(){
+  activeUnsubscribes.forEach(unsubscribe => {
+    try{ unsubscribe(); }catch(e){}
+  });
+  activeUnsubscribes = [];
+
   latestTodosByDay = new Map();
   initialized = false;
+  saveTimers.forEach(timer => clearTimeout(timer));
   saveTimers = new Map();
   newTasksBanner.hidden = true;
   daysEl.innerHTML = "";
