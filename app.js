@@ -17,6 +17,10 @@ const appView = document.getElementById("appView");
 const changeProfileBtn = document.getElementById("changeProfile");
 const appTitle = document.getElementById("appTitle");
 const profileEyebrow = document.getElementById("profileEyebrow");
+const authorChooser = document.getElementById("authorChooser");
+const AUTHOR_KEY = "fivetodo_author_v1";
+let currentAuthor = localStorage.getItem(AUTHOR_KEY) || "";
+
 
 const DAY_SPECS = [
   { offset: 0, label: "Heute" },
@@ -79,7 +83,9 @@ function emptyTodos(){
   return Array.from({length:10}, () => ({
     text:"",
     done:false,
-    createdAt:0
+    createdAt:0,
+    author:"",
+    completedAt:0
   }));
 }
 
@@ -90,7 +96,9 @@ function normalizeTodos(raw){
   return base.map((item, i) => ({
     text: typeof raw[i]?.text === "string" ? raw[i].text : "",
     done: !!raw[i]?.done,
-    createdAt: Number(raw[i]?.createdAt || 0)
+    createdAt: Number(raw[i]?.createdAt || 0),
+    author: typeof raw[i]?.author === "string" ? raw[i].author : "",
+    completedAt: Number(raw[i]?.completedAt || 0)
   }));
 }
 
@@ -107,7 +115,7 @@ function showBravo(){
   bravoTimer = setTimeout(() => {
     bravoEl.classList.remove("show");
     bravoEl.setAttribute("aria-hidden","true");
-  }, 180);
+  }, 360);
 }
 
 function showNewTasksBanner(count){
@@ -157,6 +165,8 @@ function renderShell(){
           <label class="todo-row" data-index="${i}">
             <input class="check" type="checkbox" aria-label="Todo ${i+1} erledigt">
             <input class="todo-input" maxlength="140" placeholder="Todo ${i+1}" autocomplete="off" enterkeyhint="done">
+            <span class="todo-author"></span>
+            <span class="todo-done-time"></span>
           </label>
         `).join("")}
       </div>
@@ -239,6 +249,21 @@ function applyTodos(dateKey, todos){
 
     check.checked = todo.done;
     row.dataset.createdAt = String(todo.createdAt || 0);
+    row.dataset.author = todo.author || "";
+    row.dataset.completedAt = String(todo.completedAt || 0);
+    const authorEl = row.querySelector(".todo-author");
+    if(authorEl){
+      authorEl.textContent = todo.author ? `eingetragen von ${todo.author}` : "";
+    }
+    row.classList.toggle("has-author", !!todo.author);
+
+    const doneTimeEl = row.querySelector(".todo-done-time");
+    if(doneTimeEl){
+      doneTimeEl.textContent = todo.done && todo.completedAt
+        ? `erledigt um ${new Intl.DateTimeFormat("de-CH", {hour:"2-digit", minute:"2-digit"}).format(new Date(todo.completedAt))} Uhr`
+        : "";
+    }
+    row.classList.toggle("has-done-time", !!(todo.done && todo.completedAt));
     row.classList.toggle("done", todo.done);
   });
 
@@ -257,7 +282,9 @@ function readCardTodos(dateKey){
   return [...card.querySelectorAll(".todo-row")].map(row => ({
     text: row.querySelector(".todo-input").value.trimEnd(),
     done: row.querySelector(".check").checked,
-    createdAt: Number(row.dataset.createdAt || 0)
+    createdAt: Number(row.dataset.createdAt || 0),
+    author: row.dataset.author || "",
+    completedAt: Number(row.dataset.completedAt || 0)
   }));
 }
 
@@ -293,10 +320,21 @@ function bindInputs(){
 
     if(e.target.value.trim() && Number(row.dataset.createdAt || 0) === 0){
       row.dataset.createdAt = String(Date.now());
+      row.dataset.author = currentAuthor || "";
+      const authorEl = row.querySelector(".todo-author");
+      if(authorEl){
+        authorEl.textContent = currentAuthor ? `eingetragen von ${currentAuthor}` : "";
+      }
+      row.classList.toggle("has-author", !!currentAuthor);
     }
 
     if(!e.target.value.trim()){
       row.dataset.createdAt = "0";
+      row.dataset.author = "";
+      row.dataset.completedAt = "0";
+      const authorEl = row.querySelector(".todo-author");
+      if(authorEl) authorEl.textContent = "";
+      row.classList.remove("has-author");
     }
 
     queueSave(card.dataset.date);
@@ -309,11 +347,23 @@ function bindInputs(){
     const card = e.target.closest(".day-card");
 
     row.classList.toggle("done", e.target.checked);
-    queueSave(card.dataset.date, 0);
 
     if(e.target.checked){
+      row.dataset.completedAt = String(Date.now());
       showBravo();
+    }else{
+      row.dataset.completedAt = "0";
     }
+
+    const doneTimeEl = row.querySelector(".todo-done-time");
+    if(doneTimeEl){
+      doneTimeEl.textContent = e.target.checked
+        ? `erledigt um ${new Intl.DateTimeFormat("de-CH", {hour:"2-digit", minute:"2-digit"}).format(new Date(Number(row.dataset.completedAt)))} Uhr`
+        : "";
+    }
+    row.classList.toggle("has-done-time", e.target.checked);
+
+    queueSave(card.dataset.date, 0);
   });
 }
 
@@ -456,6 +506,22 @@ function chooseProfile(profile){
 
   start();
 }
+
+
+function ensureAuthor(){
+  currentAuthor = localStorage.getItem(AUTHOR_KEY) || "";
+  authorChooser.hidden = !!currentAuthor;
+}
+
+document.querySelectorAll("[data-author]").forEach(button => {
+  button.addEventListener("click", () => {
+    currentAuthor = button.dataset.author;
+    localStorage.setItem(AUTHOR_KEY, currentAuthor);
+    authorChooser.hidden = true;
+  });
+});
+
+ensureAuthor();
 
 document.querySelectorAll("[data-profile]").forEach(button => {
   button.addEventListener("click", () => chooseProfile(button.dataset.profile));

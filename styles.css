@@ -407,3 +407,67 @@ body.profile-anouk .eyebrow{color:#f9a8d4}
   min-height: 100dvh;
   padding-top: max(16px, env(safe-area-inset-top));
 }
+
+
+.author-chooser{
+  position:fixed;
+  inset:0;
+  z-index:9999;
+  display:grid;
+  place-items:center;
+  padding:24px;
+  background:#0b1020;
+}
+.author-chooser[hidden]{display:none!important}
+.author-card{
+  width:min(100%,430px);
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:28px;
+  padding:28px 22px 24px;
+  background:rgba(17,24,39,.96);
+  box-shadow:0 30px 80px rgba(0,0,0,.38);
+}
+.author-card h1{margin:0;font-size:32px;letter-spacing:-.04em}
+.author-card p{margin:8px 0 20px;color:var(--muted)}
+.author-buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.author-buttons button{
+  min-height:64px;
+  border:1px solid rgba(255,255,255,.12);
+  border-radius:18px;
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  font:inherit;
+  font-size:17px;
+  font-weight:900;
+}
+.todo-row.has-author{
+  padding-bottom:24px;
+}
+.todo-author{
+  position:absolute;
+  left:48px;
+  bottom:4px;
+  font-size:10px;
+  font-weight:700;
+  color:var(--muted);
+  opacity:.82;
+  pointer-events:none;
+}
+
+
+.todo-row.has-done-time{
+  padding-bottom:36px;
+}
+.todo-done-time{
+  position:absolute;
+  left:48px;
+  bottom:3px;
+  font-size:10px;
+  font-weight:800;
+  color:var(--muted);
+  opacity:.8;
+  pointer-events:none;
+}
+.todo-row.has-author.has-done-time .todo-author{
+  bottom:16px;
+}

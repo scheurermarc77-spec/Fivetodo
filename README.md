@@ -64,3 +64,13 @@ Leon und Anouk verwenden beide die bereits funktionierende Firestore-Sammlung `d
 - Anouk: Dokumente wie `anouk_2026-08-15`
 
 Damit bleiben die Daten getrennt, ohne neue Firebase-Regeln.
+
+
+## Ersteller einer Aufgabe
+Beim ersten Öffnen auf einem Gerät wird einmal gefragt: Leon, Anouk, Mami oder Papi.
+Die Auswahl wird lokal auf diesem Gerät gespeichert. Bei jeder neu erstellten Aufgabe
+wird automatisch der Ersteller mitgespeichert und unter der Aufgabe angezeigt.
+
+
+## Erledigt-Zeit
+Beim Abhaken wird automatisch die Uhrzeit gespeichert und unter der Aufgabe angezeigt, z. B. `erledigt um 19:24 Uhr`. Wird der Haken entfernt, wird die Erledigt-Zeit zurückgesetzt.
