@@ -74,3 +74,8 @@ wird automatisch der Ersteller mitgespeichert und unter der Aufgabe angezeigt.
 
 ## Erledigt-Zeit
 Beim Abhaken wird automatisch die Uhrzeit gespeichert und unter der Aufgabe angezeigt, z. B. `erledigt um 19:24 Uhr`. Wird der Haken entfernt, wird die Erledigt-Zeit zurückgesetzt.
+
+## Bravo
+Das Bravo-Fenster bleibt nach dem Abhaken sichtbar, bis es angetippt wird.
+Es zeigt automatisch den auf dem Gerät hinterlegten Ersteller, z. B.:
+`Gut gemacht, Papi!`

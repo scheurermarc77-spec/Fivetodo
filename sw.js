@@ -1,4 +1,4 @@
-const CACHE = "fivetodo-v16-four-lists";
+const CACHE = "fivetodo-v17-bravo-tap";
 const ASSETS = [
   "./",
   "./index.html",

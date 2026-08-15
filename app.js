@@ -18,6 +18,7 @@ const changeProfileBtn = document.getElementById("changeProfile");
 const appTitle = document.getElementById("appTitle");
 const profileEyebrow = document.getElementById("profileEyebrow");
 const authorChooser = document.getElementById("authorChooser");
+const bravoSub = document.getElementById("bravoSub");
 const AUTHOR_KEY = "fivetodo_author_v1";
 let currentAuthor = localStorage.getItem(AUTHOR_KEY) || "";
 
@@ -111,14 +112,13 @@ function setStatus(type, text){
 }
 
 function showBravo(){
-  clearTimeout(bravoTimer);
-  bravoEl.classList.add("show");
-  bravoEl.setAttribute("aria-hidden","false");
-
-  bravoTimer = setTimeout(() => {
-    bravoEl.classList.remove("show");
-    bravoEl.setAttribute("aria-hidden","true");
-  }, 360);
+  if(bravoSub){
+    bravoSub.textContent = currentAuthor
+      ? `Gut gemacht, ${currentAuthor}!`
+      : "Gut gemacht!";
+  }
+  bravo.classList.add("show");
+  bravo.setAttribute("aria-hidden","false");
 }
 
 function showNewTasksBanner(count){
@@ -526,6 +526,11 @@ document.querySelectorAll("[data-author]").forEach(button => {
 });
 
 ensureAuthor();
+
+bravo.addEventListener("click", () => {
+  bravo.classList.remove("show");
+  bravo.setAttribute("aria-hidden","true");
+});
 
 document.querySelectorAll("[data-profile]").forEach(button => {
   button.addEventListener("click", () => chooseProfile(button.dataset.profile));
