@@ -1,4 +1,4 @@
-const CACHE = "fivetodo-v15-completed-time";
+const CACHE = "fivetodo-v16-four-lists";
 const ASSETS = [
   "./",
   "./index.html",

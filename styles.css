@@ -471,3 +471,6 @@ body.profile-anouk .eyebrow{color:#f9a8d4}
 .todo-row.has-author.has-done-time .todo-author{
   bottom:16px;
 }
+
+.profile-button.mami .profile-avatar{background:linear-gradient(135deg,#f59e0b,#ef4444)}
+.profile-button.papi .profile-avatar{background:linear-gradient(135deg,#10b981,#2563eb)}

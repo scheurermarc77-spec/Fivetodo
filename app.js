@@ -40,7 +40,10 @@ function collectionName(){
 }
 
 function profileDayKey(dateKey){
-  return currentProfile === "anouk" ? `anouk_${dateKey}` : dateKey;
+  if(currentProfile === "anouk") return `anouk_${dateKey}`;
+  if(currentProfile === "mami") return `mami_${dateKey}`;
+  if(currentProfile === "papi") return `papi_${dateKey}`;
+  return dateKey;
 }
 
 let db = null;
@@ -500,9 +503,10 @@ function chooseProfile(profile){
   appView.hidden = false;
   window.scrollTo({ top: 0, left: 0, behavior: "instant" });
 
-  const name = profile === "anouk" ? "Anouk" : "Leon";
+  const names = {leon:"Leon", anouk:"Anouk", mami:"Mami", papi:"Papi"};
+  const name = names[profile] || "Leon";
   appTitle.textContent = `FiveTodo · ${name}`;
-  profileEyebrow.textContent = profile === "anouk" ? "ANOUK · LIVE" : "LEON · LIVE";
+  profileEyebrow.textContent = `${name.toUpperCase()} · LIVE`;
 
   start();
 }
