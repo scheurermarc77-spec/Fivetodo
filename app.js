@@ -157,31 +157,35 @@ function injectOverdueStyles(){
     .todo-row.is-overdue{
       position:relative;
       margin:6px 0;
-      padding-right:110px;
       border:3px solid #f59e0b;
       border-radius:14px;
       background:rgba(245,158,11,.08);
       box-shadow:0 0 0 4px rgba(245,158,11,.08),0 10px 28px rgba(0,0,0,.18);
     }
     .todo-row.is-overdue::after{
-      content:"VERSPÄTET";
+      content:"!";
       position:absolute;
-      right:9px;
-      top:50%;
-      transform:translateY(-50%);
-      min-width:86px;
+      right:-7px;
+      top:-9px;
+      width:25px;
+      height:25px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
       text-align:center;
-      font-size:11px;
+      font-size:17px;
+      line-height:1;
       font-weight:950;
-      letter-spacing:.06em;
       color:#17100a;
-      padding:7px 8px;
-      border-radius:999px;
+      border-radius:50%;
       background:#f59e0b;
-      box-shadow:0 8px 20px rgba(0,0,0,.25);
+      border:2px solid rgba(255,255,255,.9);
+      box-shadow:0 5px 14px rgba(0,0,0,.28);
+      pointer-events:none;
+      z-index:2;
     }
     .todo-row.is-overdue.is-new::after{
-      content:"VERSPÄTET";
+      content:"!";
       background:#f59e0b;
       color:#17100a;
     }
