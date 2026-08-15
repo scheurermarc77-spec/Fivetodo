@@ -3,7 +3,9 @@ import {
   getFirestore,
   doc,
   onSnapshot,
-  setDoc
+  getDoc,
+  setDoc,
+  runTransaction
 } from "https://www.gstatic.com/firebasejs/12.1.0/firebase-firestore.js";
 
 const daysEl = document.getElementById("days");
@@ -19,9 +21,9 @@ const appTitle = document.getElementById("appTitle");
 const profileEyebrow = document.getElementById("profileEyebrow");
 const authorChooser = document.getElementById("authorChooser");
 const bravoSub = document.getElementById("bravoSub");
+
 const AUTHOR_KEY = "fivetodo_author_v1";
 let currentAuthor = localStorage.getItem(AUTHOR_KEY) || "";
-
 
 const DAY_SPECS = [
   { offset: 0, label: "Heute" },
@@ -31,6 +33,15 @@ const DAY_SPECS = [
 ];
 
 let currentProfile = null;
+let db = null;
+let firebaseApp = null;
+let activeUnsubscribes = [];
+let resumeDetectionReady = false;
+let saveTimers = new Map();
+let latestTodosByDay = new Map();
+let initialized = false;
+let midnightTimer = null;
+let overdueBanner = null;
 
 function lastSeenKey(){
   return `fivetodo_last_seen_at_v3_${currentProfile || "none"}`;
@@ -47,21 +58,18 @@ function profileDayKey(dateKey){
   return dateKey;
 }
 
-let db = null;
-let firebaseApp = null;
-let activeUnsubscribes = [];
-let resumeDetectionReady = false;
-let saveTimers = new Map();
-let bravoTimer = null;
-let latestTodosByDay = new Map();
-let appVisibleSince = Date.now();
-let initialized = false;
-
 function isoDateLocal(d){
   const y = d.getFullYear();
   const m = String(d.getMonth()+1).padStart(2,"0");
   const day = String(d.getDate()).padStart(2,"0");
   return `${y}-${m}-${day}`;
+}
+
+function addDays(dateKey, amount){
+  const [y,m,d] = dateKey.split("-").map(Number);
+  const date = new Date(y, m-1, d, 12, 0, 0, 0);
+  date.setDate(date.getDate() + amount);
+  return isoDateLocal(date);
 }
 
 function formatDate(d){
@@ -83,32 +91,141 @@ function getDayInfo(){
   });
 }
 
-function emptyTodos(){
-  return Array.from({length:10}, () => ({
+function emptyTodo(){
+  return {
     text:"",
     done:false,
     createdAt:0,
     author:"",
-    completedAt:0
-  }));
+    completedAt:0,
+    overdue:false,
+    overdueSince:"",
+    rolledFrom:""
+  };
+}
+
+function emptyTodos(){
+  return Array.from({length:10}, () => emptyTodo());
 }
 
 function normalizeTodos(raw){
   const base = emptyTodos();
   if(!Array.isArray(raw)) return base;
-
   return base.map((item, i) => ({
     text: typeof raw[i]?.text === "string" ? raw[i].text : "",
     done: !!raw[i]?.done,
     createdAt: Number(raw[i]?.createdAt || 0),
     author: typeof raw[i]?.author === "string" ? raw[i].author : "",
-    completedAt: Number(raw[i]?.completedAt || 0)
+    completedAt: Number(raw[i]?.completedAt || 0),
+    overdue: !!raw[i]?.overdue,
+    overdueSince: typeof raw[i]?.overdueSince === "string" ? raw[i].overdueSince : "",
+    rolledFrom: typeof raw[i]?.rolledFrom === "string" ? raw[i].rolledFrom : ""
   }));
 }
 
 function setStatus(type, text){
   statusEl.className = `status ${type}`;
   statusText.textContent = text;
+}
+
+function injectOverdueStyles(){
+  if(document.getElementById("fivetodo-overdue-styles")) return;
+  const style = document.createElement("style");
+  style.id = "fivetodo-overdue-styles";
+  style.textContent = `
+    .overdue-banner{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      margin:0 2px 16px;
+      padding:14px 16px;
+      border-radius:16px;
+      background:linear-gradient(90deg,rgba(245,158,11,.19),rgba(251,113,133,.16));
+      border:2px solid rgba(245,158,11,.72);
+      color:var(--text);
+      font-size:15px;
+      font-weight:800;
+      box-shadow:0 10px 28px rgba(0,0,0,.18);
+    }
+    .overdue-banner[hidden]{display:none!important}
+    .overdue-dot{
+      width:10px;height:10px;border-radius:50%;
+      background:#f59e0b;
+      box-shadow:0 0 0 5px rgba(245,158,11,.12);
+      flex:0 0 auto;
+    }
+    .todo-row.is-overdue{
+      position:relative;
+      margin:6px 0;
+      padding-right:110px;
+      border:3px solid #f59e0b;
+      border-radius:14px;
+      background:rgba(245,158,11,.08);
+      box-shadow:0 0 0 4px rgba(245,158,11,.08),0 10px 28px rgba(0,0,0,.18);
+    }
+    .todo-row.is-overdue::after{
+      content:"VERSPÄTET";
+      position:absolute;
+      right:9px;
+      top:50%;
+      transform:translateY(-50%);
+      min-width:86px;
+      text-align:center;
+      font-size:11px;
+      font-weight:950;
+      letter-spacing:.06em;
+      color:#17100a;
+      padding:7px 8px;
+      border-radius:999px;
+      background:#f59e0b;
+      box-shadow:0 8px 20px rgba(0,0,0,.25);
+    }
+    .todo-row.is-overdue.is-new::after{
+      content:"VERSPÄTET";
+      background:#f59e0b;
+      color:#17100a;
+    }
+    .todo-row.done.is-overdue{
+      margin:0;
+      padding-right:0;
+      border:0;
+      border-bottom:1px solid var(--border);
+      border-radius:0;
+      background:transparent;
+      box-shadow:none;
+      animation:none;
+    }
+    .todo-row.done.is-overdue::after{display:none}
+  `;
+  document.head.appendChild(style);
+}
+
+function ensureOverdueBanner(){
+  if(overdueBanner) return overdueBanner;
+  overdueBanner = document.createElement("div");
+  overdueBanner.id = "overdueBanner";
+  overdueBanner.className = "overdue-banner";
+  overdueBanner.hidden = true;
+  overdueBanner.innerHTML = `<span class="overdue-dot"></span><span id="overdueText"></span>`;
+  if(newTasksBanner?.parentNode){
+    newTasksBanner.parentNode.insertBefore(overdueBanner, newTasksBanner.nextSibling);
+  }else if(daysEl?.parentNode){
+    daysEl.parentNode.insertBefore(overdueBanner, daysEl);
+  }
+  return overdueBanner;
+}
+
+function showOverdueBanner(count){
+  const banner = ensureOverdueBanner();
+  const text = banner.querySelector("#overdueText");
+  if(count <= 0){
+    banner.hidden = true;
+    return;
+  }
+  text.textContent = count === 1
+    ? "1 Aufgabe ist verspätet und wurde auf heute übertragen"
+    : `${count} Aufgaben sind verspätet und wurden auf heute übertragen`;
+  banner.hidden = false;
 }
 
 function showBravo(){
@@ -122,21 +239,21 @@ function showBravo(){
 }
 
 function showNewTasksBanner(count){
+  if(!newTasksBanner) return;
   if(count <= 0){
     newTasksBanner.hidden = true;
     return;
   }
-
-  newTasksText.textContent = count === 1
-    ? "1 neue Aufgabe seit deinem letzten Besuch"
-    : `${count} neue Aufgaben seit deinem letzten Besuch`;
-
+  if(newTasksText){
+    newTasksText.textContent = count === 1
+      ? "1 neue Aufgabe seit deinem letzten Besuch"
+      : `${count} neue Aufgaben seit deinem letzten Besuch`;
+  }
   newTasksBanner.hidden = false;
 }
 
 function renderShell(){
   daysEl.innerHTML = "";
-
   for(const info of getDayInfo()){
     const card = document.createElement("section");
     card.className = "day-card";
@@ -174,23 +291,18 @@ function renderShell(){
         `).join("")}
       </div>
     `;
-
     daysEl.appendChild(card);
   }
 
   const yesterdayButton = document.getElementById("showYesterday");
   const yesterdayCard = document.querySelector(".yesterday-card");
-
   if(yesterdayButton && yesterdayCard){
     yesterdayButton.addEventListener("click", () => {
       const willShow = yesterdayCard.hidden;
       yesterdayCard.hidden = !willShow;
       yesterdayButton.textContent = willShow ? "↑ Gestern schliessen" : "← Gestern";
-
       if(willShow){
-        setTimeout(() => {
-          yesterdayCard.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 40);
+        setTimeout(() => yesterdayCard.scrollIntoView({behavior:"smooth",block:"start"}), 40);
       }
     });
   }
@@ -206,33 +318,35 @@ function markCurrentMomentSeen(){
 
 function getNewTaskKeysSince(lastSeen){
   const keys = [];
-
   for(const [dateKey, todos] of latestTodosByDay.entries()){
-    const norm = normalizeTodos(todos);
-
-    norm.forEach((todo, index) => {
+    normalizeTodos(todos).forEach((todo, index) => {
       if(todo.text && todo.createdAt > 0 && todo.createdAt > lastSeen){
         keys.push(`${dateKey}:${index}`);
       }
     });
   }
-
   return new Set(keys);
 }
 
-function refreshNewIndicators(){
+function refreshIndicators(){
   if(!initialized) return;
-
   const lastSeen = readLastSeen();
   const newKeys = getNewTaskKeysSince(lastSeen);
+  let overdueCount = 0;
 
   document.querySelectorAll(".todo-row").forEach(row => {
     const card = row.closest(".day-card");
     const key = `${card.dataset.date}:${row.dataset.index}`;
-    row.classList.toggle("is-new", newKeys.has(key));
+    const isDone = row.querySelector(".check").checked;
+    const isOverdue = row.dataset.overdue === "1" && !isDone;
+
+    row.classList.toggle("is-new", newKeys.has(key) && !isDone);
+    row.classList.toggle("is-overdue", isOverdue);
+    if(isOverdue && card.dataset.label === "Heute") overdueCount++;
   });
 
   showNewTasksBanner(newKeys.size);
+  showOverdueBanner(overdueCount);
 }
 
 function applyTodos(dateKey, todos){
@@ -240,7 +354,6 @@ function applyTodos(dateKey, todos){
   if(!card) return;
 
   const norm = normalizeTodos(todos);
-
   norm.forEach((todo, i) => {
     const row = card.querySelector(`[data-index="${i}"]`);
     const check = row.querySelector(".check");
@@ -254,6 +367,10 @@ function applyTodos(dateKey, todos){
     row.dataset.createdAt = String(todo.createdAt || 0);
     row.dataset.author = todo.author || "";
     row.dataset.completedAt = String(todo.completedAt || 0);
+    row.dataset.overdue = todo.overdue ? "1" : "0";
+    row.dataset.overdueSince = todo.overdueSince || "";
+    row.dataset.rolledFrom = todo.rolledFrom || "";
+
     const authorEl = row.querySelector(".todo-author");
     if(authorEl){
       authorEl.textContent = todo.author ? `eingetragen von ${todo.author}` : "";
@@ -263,19 +380,20 @@ function applyTodos(dateKey, todos){
     const doneTimeEl = row.querySelector(".todo-done-time");
     if(doneTimeEl){
       doneTimeEl.textContent = todo.done && todo.completedAt
-        ? `erledigt um ${new Intl.DateTimeFormat("de-CH", {hour:"2-digit", minute:"2-digit"}).format(new Date(todo.completedAt))} Uhr`
+        ? `erledigt um ${new Intl.DateTimeFormat("de-CH",{hour:"2-digit",minute:"2-digit"}).format(new Date(todo.completedAt))} Uhr`
         : "";
     }
+
     row.classList.toggle("has-done-time", !!(todo.done && todo.completedAt));
     row.classList.toggle("done", todo.done);
+    row.classList.toggle("is-overdue", !!todo.overdue && !todo.done);
   });
 
   const doneCount = norm.filter(t => t.done).length;
   const count = document.getElementById(`count-${dateKey}`);
+  if(count) count.textContent = `${doneCount}/10`;
 
-  if(count){
-    count.textContent = `${doneCount}/10`;
-  }
+  if(initialized) refreshIndicators();
 }
 
 function readCardTodos(dateKey){
@@ -287,7 +405,10 @@ function readCardTodos(dateKey){
     done: row.querySelector(".check").checked,
     createdAt: Number(row.dataset.createdAt || 0),
     author: row.dataset.author || "",
-    completedAt: Number(row.dataset.completedAt || 0)
+    completedAt: Number(row.dataset.completedAt || 0),
+    overdue: row.dataset.overdue === "1",
+    overdueSince: row.dataset.overdueSince || "",
+    rolledFrom: row.dataset.rolledFrom || ""
   }));
 }
 
@@ -298,15 +419,13 @@ function queueSave(dateKey, delay=220){
 
 async function saveDay(dateKey){
   if(!db) return;
-
   try{
     const todos = readCardTodos(dateKey);
-
     await setDoc(doc(db, collectionName(), profileDayKey(dateKey)), {
       todos,
       updatedAt: Date.now()
     }, {merge:true});
-
+    latestTodosByDay.set(dateKey, todos);
     setStatus("online","Live");
   }catch(err){
     console.error(err);
@@ -324,6 +443,10 @@ function bindInputs(){
     if(e.target.value.trim() && Number(row.dataset.createdAt || 0) === 0){
       row.dataset.createdAt = String(Date.now());
       row.dataset.author = currentAuthor || "";
+      row.dataset.overdue = "0";
+      row.dataset.overdueSince = "";
+      row.dataset.rolledFrom = "";
+
       const authorEl = row.querySelector(".todo-author");
       if(authorEl){
         authorEl.textContent = currentAuthor ? `eingetragen von ${currentAuthor}` : "";
@@ -335,9 +458,16 @@ function bindInputs(){
       row.dataset.createdAt = "0";
       row.dataset.author = "";
       row.dataset.completedAt = "0";
+      row.dataset.overdue = "0";
+      row.dataset.overdueSince = "";
+      row.dataset.rolledFrom = "";
+
       const authorEl = row.querySelector(".todo-author");
       if(authorEl) authorEl.textContent = "";
-      row.classList.remove("has-author");
+      const doneTimeEl = row.querySelector(".todo-done-time");
+      if(doneTimeEl) doneTimeEl.textContent = "";
+
+      row.classList.remove("has-author","has-done-time","done","is-new","is-overdue");
     }
 
     queueSave(card.dataset.date);
@@ -353,63 +483,201 @@ function bindInputs(){
 
     if(e.target.checked){
       row.dataset.completedAt = String(Date.now());
+      // Sobald erledigt: keine Verspätet-Darstellung mehr.
+      row.classList.remove("is-overdue","is-new");
       showBravo();
     }else{
       row.dataset.completedAt = "0";
+      if(row.dataset.overdue === "1") row.classList.add("is-overdue");
     }
 
     const doneTimeEl = row.querySelector(".todo-done-time");
     if(doneTimeEl){
       doneTimeEl.textContent = e.target.checked
-        ? `erledigt um ${new Intl.DateTimeFormat("de-CH", {hour:"2-digit", minute:"2-digit"}).format(new Date(Number(row.dataset.completedAt)))} Uhr`
+        ? `erledigt um ${new Intl.DateTimeFormat("de-CH",{hour:"2-digit",minute:"2-digit"}).format(new Date(Number(row.dataset.completedAt)))} Uhr`
         : "";
     }
     row.classList.toggle("has-done-time", e.target.checked);
 
     queueSave(card.dataset.date, 0);
+    setTimeout(refreshIndicators, 20);
   });
 }
 
 function firebaseLooksConfigured(){
   const c = window.FIREBASE_CONFIG;
-
   return c && Object.values(c).every(v =>
-    typeof v === "string" &&
-    v &&
-    !v.includes("HIER_EINTRAGEN")
+    typeof v === "string" && v && !v.includes("HIER_EINTRAGEN")
   );
+}
+
+/**
+ * Verschiebt alle nicht erledigten Aufgaben eines vergangenen Tages
+ * in den Folgetag. Bereits verspätete Aufgaben wandern bei weiterer
+ * Nichterledigung jeden Tag erneut mit.
+ *
+ * Die Transaktion verhindert, dass zwei iPhones dieselben Aufgaben
+ * gleichzeitig doppelt verschieben.
+ */
+async function rolloverOneDay(sourceDateKey){
+  if(!db || !currentProfile) return 0;
+
+  const targetDateKey = addDays(sourceDateKey, 1);
+  const sourceRef = doc(db, collectionName(), profileDayKey(sourceDateKey));
+  const targetRef = doc(db, collectionName(), profileDayKey(targetDateKey));
+
+  let movedCount = 0;
+
+  await runTransaction(db, async transaction => {
+    const sourceSnap = await transaction.get(sourceRef);
+    const targetSnap = await transaction.get(targetRef);
+
+    if(!sourceSnap.exists()) return;
+
+    const sourceData = sourceSnap.data() || {};
+    // Schutz gegen doppeltes Verschieben desselben Tages.
+    if(sourceData.rolloverDoneTo === targetDateKey) return;
+
+    const source = normalizeTodos(sourceData.todos);
+    const target = normalizeTodos(targetSnap.exists() ? targetSnap.data().todos : []);
+
+    const candidates = source
+      .map((todo, index) => ({todo, index}))
+      .filter(({todo}) => todo.text.trim() && !todo.done);
+
+    if(candidates.length === 0){
+      transaction.set(sourceRef, {
+        rolloverDoneTo: targetDateKey,
+        rolloverCheckedAt: Date.now(),
+        updatedAt: Date.now()
+      }, {merge:true});
+      return;
+    }
+
+    const emptySlots = target
+      .map((todo, index) => (!todo.text.trim() ? index : -1))
+      .filter(index => index >= 0);
+
+    const transferable = candidates.slice(0, emptySlots.length);
+    const now = Date.now();
+
+    transferable.forEach(({todo, index: sourceIndex}, n) => {
+      const targetIndex = emptySlots[n];
+      target[targetIndex] = {
+        ...todo,
+        done:false,
+        completedAt:0,
+        // Übertragene Aufgabe wird wie neu behandelt.
+        createdAt: now + n,
+        overdue:true,
+        overdueSince: todo.overdueSince || sourceDateKey,
+        rolledFrom: sourceDateKey
+      };
+      source[sourceIndex] = emptyTodo();
+      movedCount++;
+    });
+
+    transaction.set(targetRef, {
+      todos: target,
+      updatedAt: now
+    }, {merge:true});
+
+    transaction.set(sourceRef, {
+      todos: source,
+      // Nur als vollständig erledigt markieren, wenn alle Kandidaten Platz hatten.
+      rolloverDoneTo: transferable.length === candidates.length ? targetDateKey : "",
+      rolloverCheckedAt: now,
+      updatedAt: now
+    }, {merge:true});
+  });
+
+  return movedCount;
+}
+
+async function rolloverMissedDays(){
+  if(!db || !currentProfile) return;
+
+  const todayKey = isoDateLocal(new Date());
+  const yesterdayKey = addDays(todayKey, -1);
+
+  // Für den normalen Fall genügt gestern -> heute.
+  // Zusätzlich bis zu 14 Tage zurück prüfen, falls die App länger nicht geöffnet war.
+  const sources = [];
+  for(let i = 14; i >= 1; i--){
+    sources.push(addDays(todayKey, -i));
+  }
+
+  let totalMoved = 0;
+  for(const sourceKey of sources){
+    // Nur Tage vor heute.
+    if(sourceKey < todayKey){
+      try{
+        totalMoved += await rolloverOneDay(sourceKey);
+      }catch(err){
+        console.error("Übertragung fehlgeschlagen:", sourceKey, err);
+      }
+    }
+  }
+
+  if(totalMoved > 0){
+    // Die Live-Snapshots aktualisieren die Ansicht; kleine Verzögerung für Banner.
+    setTimeout(refreshIndicators, 350);
+  }
+}
+
+function msUntilNextMidnight(){
+  const now = new Date();
+  const next = new Date(now);
+  next.setHours(24,0,1,0);
+  return Math.max(1000, next.getTime() - now.getTime());
+}
+
+function scheduleMidnightRollover(){
+  clearTimeout(midnightTimer);
+  midnightTimer = setTimeout(async () => {
+    if(currentProfile && document.visibilityState === "visible"){
+      await rolloverMissedDays();
+      // Nach Datumswechsel Karten neu aufbauen und neu abonnieren.
+      chooseProfile(currentProfile);
+    }
+    scheduleMidnightRollover();
+  }, msUntilNextMidnight());
 }
 
 function setupResumeDetection(){
   if(resumeDetectionReady) return;
   resumeDetectionReady = true;
 
-  document.addEventListener("visibilitychange", () => {
+  document.addEventListener("visibilitychange", async () => {
     if(document.visibilityState === "hidden"){
-      // Zeitpunkt merken, an dem der Nutzer FiveTodo verlassen hat.
       markCurrentMomentSeen();
       return;
     }
 
     if(document.visibilityState === "visible"){
-      appVisibleSince = Date.now();
-
-      // Firestore liefert ohnehin den aktuellen Stand live.
-      // Kurz warten, damit ein eventuell neuer Snapshot zuerst ankommt.
-      setTimeout(() => {
-        refreshNewIndicators();
-      }, 350);
+      // Nach Rückkehr prüfen, ob inzwischen Mitternacht war.
+      try{
+        await rolloverMissedDays();
+      }catch(err){
+        console.error(err);
+      }
+      setTimeout(refreshIndicators, 350);
     }
   });
 
-  window.addEventListener("pageshow", () => {
-    setTimeout(() => {
-      refreshNewIndicators();
-    }, 350);
+  window.addEventListener("pageshow", async () => {
+    try{
+      await rolloverMissedDays();
+    }catch(err){
+      console.error(err);
+    }
+    setTimeout(refreshIndicators, 350);
   });
 }
 
 async function start(){
+  injectOverdueStyles();
+  ensureOverdueBanner();
   renderShell();
   bindInputs();
   setupResumeDetection();
@@ -424,50 +692,46 @@ async function start(){
       firebaseApp = initializeApp(window.FIREBASE_CONFIG);
     }
     db = getFirestore(firebaseApp);
-
     setStatus("","Verbinde…");
+
+    // Zuerst fällige Aufgaben verschieben, erst danach Live-Listener aufbauen.
+    await rolloverMissedDays();
 
     let firstSnapshotsLeft = DAY_SPECS.length;
 
     for(const info of getDayInfo()){
-      const unsubscribe = onSnapshot(doc(db, collectionName(), profileDayKey(info.key)), snap => {
-        const todos = snap.exists()
-          ? snap.data().todos
-          : emptyTodos();
+      const unsubscribe = onSnapshot(
+        doc(db, collectionName(), profileDayKey(info.key)),
+        snap => {
+          const todos = snap.exists() ? snap.data().todos : emptyTodos();
+          latestTodosByDay.set(info.key, todos);
+          applyTodos(info.key, todos);
+          setStatus("online","Live");
 
-        latestTodosByDay.set(info.key, todos);
-        applyTodos(info.key, todos);
-
-        setStatus("online","Live");
-
-        if(firstSnapshotsLeft > 0){
-          firstSnapshotsLeft--;
-
-          if(firstSnapshotsLeft === 0){
-            initialized = true;
-
-            // Beim allerersten Start auf diesem Gerät alte Aufgaben nicht als neu markieren.
-            if(readLastSeen() === 0){
-              markCurrentMomentSeen();
-              showNewTasksBanner(0);
-            }else{
-              refreshNewIndicators();
+          if(firstSnapshotsLeft > 0){
+            firstSnapshotsLeft--;
+            if(firstSnapshotsLeft === 0){
+              initialized = true;
+              if(readLastSeen() === 0){
+                markCurrentMomentSeen();
+                showNewTasksBanner(0);
+              }else{
+                refreshIndicators();
+              }
             }
+          }else if(document.visibilityState === "visible"){
+            refreshIndicators();
           }
-        }else{
-          // Kommt während einer sichtbaren Sitzung eine neue Aufgabe rein,
-          // markieren wir sie ebenfalls sofort.
-          if(document.visibilityState === "visible"){
-            refreshNewIndicators();
-          }
+        },
+        err => {
+          console.error(err);
+          setStatus("offline","Offline");
         }
-      }, err => {
-        console.error(err);
-        setStatus("offline","Offline");
-      });
-
+      );
       activeUnsubscribes.push(unsubscribe);
     }
+
+    scheduleMidnightRollover();
   }catch(err){
     console.error(err);
     setStatus("offline","Fehler");
@@ -485,12 +749,14 @@ function resetForProfile(){
     try{ unsubscribe(); }catch(e){}
   });
   activeUnsubscribes = [];
-
   latestTodosByDay = new Map();
   initialized = false;
   saveTimers.forEach(timer => clearTimeout(timer));
   saveTimers = new Map();
-  newTasksBanner.hidden = true;
+  clearTimeout(midnightTimer);
+
+  if(newTasksBanner) newTasksBanner.hidden = true;
+  if(overdueBanner) overdueBanner.hidden = true;
   daysEl.innerHTML = "";
 }
 
@@ -501,16 +767,15 @@ function chooseProfile(profile){
   document.body.classList.toggle("profile-anouk", profile === "anouk");
   profileChooser.hidden = true;
   appView.hidden = false;
-  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  window.scrollTo({top:0,left:0,behavior:"instant"});
 
-  const names = {leon:"Leon", anouk:"Anouk", mami:"Mami", papi:"Papi"};
+  const names = {leon:"Leon",anouk:"Anouk",mami:"Mami",papi:"Papi"};
   const name = names[profile] || "Leon";
   appTitle.textContent = `FiveTodo · ${name}`;
   profileEyebrow.textContent = `${name.toUpperCase()} · LIVE`;
 
   start();
 }
-
 
 function ensureAuthor(){
   currentAuthor = localStorage.getItem(AUTHOR_KEY) || "";
@@ -538,8 +803,9 @@ document.querySelectorAll("[data-profile]").forEach(button => {
 
 changeProfileBtn.addEventListener("click", () => {
   currentProfile = null;
+  resetForProfile();
   appView.hidden = true;
   profileChooser.hidden = false;
-  window.scrollTo({ top: 0, left: 0, behavior: "instant" });
+  window.scrollTo({top:0,left:0,behavior:"instant"});
   document.body.classList.remove("profile-anouk");
 });
