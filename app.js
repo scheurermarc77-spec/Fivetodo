@@ -334,8 +334,8 @@ async function getProfileOverviewCounts(profile){
   const newSince = Number(localStorage.getItem(lastSeenKey(profile)) || 0);
   const doneSince = Number(localStorage.getItem(completedSeenKey(profile)) || newSince || 0);
 
-  let newCount = 0;
-  let doneCount = 0;
+  let newCount = 0; // Anzahl aktuell offener Aufgaben
+  let doneCount = 0; // Anzahl neu erledigter Aufgaben
 
   // Überblick über die sichtbaren/relevanten Tage.
   for(const info of getDayInfo()){
@@ -347,10 +347,12 @@ async function getProfileOverviewCounts(profile){
       for(const todo of todos){
         if(!todo.text.trim()) continue;
 
-        if(!todo.done && todo.createdAt > 0 && todo.createdAt > newSince){
+        // Rot oben rechts: ALLE aktuell noch nicht erledigten Aufgaben.
+        if(!todo.done){
           newCount++;
         }
 
+        // Grün unten rechts: nur seit dem letzten Öffnen neu erledigte Aufgaben.
         if(todo.done && todo.completedAt > 0 && todo.completedAt > doneSince){
           doneCount++;
         }
@@ -379,7 +381,7 @@ async function refreshProfileOverviewBadges(){
     if(red){
       red.textContent = newCount > 99 ? "99+" : String(newCount);
       red.hidden = newCount <= 0;
-      red.title = `${newCount} neue Aufgabe${newCount === 1 ? "" : "n"}`;
+      red.title = `${newCount} noch nicht erledigte Aufgabe${newCount === 1 ? "" : "n"}`;
     }
     if(green){
       green.textContent = doneCount > 99 ? "99+" : String(doneCount);
@@ -953,9 +955,7 @@ function chooseProfile(profile){
 
   const selectedButton = document.querySelector(`[data-profile="${profile}"]`);
   if(selectedButton){
-    const red = selectedButton.querySelector(".profile-new-badge");
     const green = selectedButton.querySelector(".profile-done-badge");
-    if(red) red.hidden = true;
     if(green) green.hidden = true;
   }
 
