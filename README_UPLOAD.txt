@@ -1,11 +1,9 @@
-FiveTodo – Personenübersicht angepasst
+FiveTodo – Fix für verwaisten Erstellertext
 
-NEU
-- Rot oben rechts: Anzahl ALLER aktuell noch nicht erledigten Aufgaben der Person.
-- Dieser rote Zähler bleibt bestehen und ändert sich nur, wenn Aufgaben hinzukommen oder erledigt werden.
-- Grün unten rechts: Anzahl der seit dem letzten Öffnen neu erledigten Aufgaben.
-- Sobald die betreffende Person geöffnet wird, wird nur der grüne Zähler als gesehen zurückgesetzt.
-- Beim Zurückkehren zur Übersicht werden die Zähler wieder aktuell geladen.
+Behoben:
+- «eingetragen von Papi/Leon/Anouk/Mami» wird nur noch angezeigt, wenn in genau dieser Zeile tatsächlich eine Aufgabe vorhanden ist.
+- Bei leeren Todo-Zeilen werden Ersteller und Erledigt-Zeit immer vollständig ausgeblendet.
+- Dadurch kann unter Todo 10 kein verwaister Erstellertext mehr stehen.
 
 UPLOAD
 In GitHub nur die bestehende app.js durch diese neue app.js ersetzen und Commit changes bestätigen.

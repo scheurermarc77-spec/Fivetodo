@@ -229,6 +229,8 @@ function injectOverdueStyles(){
       animation:none;
     }
     .todo-row.done.is-overdue::after{display:none}
+    .todo-row:not(.has-author) .todo-author{display:none!important}
+    .todo-row:not(.has-done-time) .todo-done-time{display:none!important}
     .profile-button,
     [data-profile]{
       position:relative;
@@ -543,20 +545,22 @@ function applyTodos(dateKey, todos){
     row.dataset.overdueSince = todo.overdueSince || "";
     row.dataset.rolledFrom = todo.rolledFrom || "";
 
+    const hasTaskText = !!todo.text.trim();
+
     const authorEl = row.querySelector(".todo-author");
     if(authorEl){
-      authorEl.textContent = todo.author ? `eingetragen von ${todo.author}` : "";
+      authorEl.textContent = hasTaskText && todo.author ? `eingetragen von ${todo.author}` : "";
     }
-    row.classList.toggle("has-author", !!todo.author);
+    row.classList.toggle("has-author", hasTaskText && !!todo.author);
 
     const doneTimeEl = row.querySelector(".todo-done-time");
     if(doneTimeEl){
-      doneTimeEl.textContent = todo.done && todo.completedAt
+      doneTimeEl.textContent = hasTaskText && todo.done && todo.completedAt
         ? `erledigt um ${new Intl.DateTimeFormat("de-CH",{hour:"2-digit",minute:"2-digit"}).format(new Date(todo.completedAt))} Uhr`
         : "";
     }
 
-    row.classList.toggle("has-done-time", !!(todo.done && todo.completedAt));
+    row.classList.toggle("has-done-time", !!(hasTaskText && todo.done && todo.completedAt));
     row.classList.toggle("done", todo.done);
     row.classList.toggle("is-overdue", !!todo.overdue && !todo.done);
   });
