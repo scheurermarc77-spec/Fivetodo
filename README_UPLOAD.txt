@@ -1,10 +1,13 @@
-FiveTodo – Verspätet-Markierung angepasst
+FiveTodo – Listen beim Öffnen automatisch aufräumen
 
-Änderung:
-- Das Wort «VERSPÄTET» bei der Aufgabe wurde entfernt.
-- Stattdessen erscheint bei einer verspäteten, noch offenen Aufgabe oben rechts ein rundes Ausrufezeichen-Symbol (!).
-- Der Aufgabentext wird dadurch nicht mehr verdeckt.
-- Sobald die Aufgabe erledigt wird, verschwindet das Ausrufezeichen wie die bisherige Verspätet-Markierung.
+NEU
+- Jede Tagesliste wird beim Öffnen automatisch ohne Lücken angeordnet.
+- Ganz oben stehen offene Aufgaben, die vom Vortag übernommen wurden.
+- Danach folgen die übrigen offenen Aufgaben.
+- Danach folgen erledigte Aufgaben.
+- Leere Felder werden immer ganz nach unten verschoben.
+- Die aufgeräumte Reihenfolge wird auch in Firestore gespeichert.
 
-Upload:
-In GitHub nur die bestehende app.js durch diese app.js ersetzen und Commit changes bestätigen.
+UPLOAD
+In GitHub nur die bestehende app.js durch diese neue app.js ersetzen und Commit changes bestätigen.
+Danach die FiveTodo-App auf dem iPhone vollständig schliessen und neu öffnen.

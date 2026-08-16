@@ -123,6 +123,31 @@ function normalizeTodos(raw){
   }));
 }
 
+function compactAndSortTodos(raw){
+  const todos = normalizeTodos(raw).filter(todo => todo.text.trim());
+
+  todos.sort((a,b) => {
+    const group = todo => {
+      if(!todo.done && (todo.overdue || todo.rolledFrom)) return 0;
+      if(!todo.done) return 1;
+      return 2;
+    };
+
+    const ga = group(a);
+    const gb = group(b);
+    if(ga !== gb) return ga - gb;
+
+    const ca = Number(a.createdAt || 0);
+    const cb = Number(b.createdAt || 0);
+    if(ca !== cb) return ca - cb;
+
+    return String(a.text).localeCompare(String(b.text), "de");
+  });
+
+  while(todos.length < 10) todos.push(emptyTodo());
+  return todos.slice(0,10);
+}
+
 function setStatus(type, text){
   statusEl.className = `status ${type}`;
   statusText.textContent = text;
@@ -357,7 +382,7 @@ function applyTodos(dateKey, todos){
   const card = document.querySelector(`[data-date="${dateKey}"]`);
   if(!card) return;
 
-  const norm = normalizeTodos(todos);
+  const norm = compactAndSortTodos(todos);
   norm.forEach((todo, i) => {
     const row = card.querySelector(`[data-index="${i}"]`);
     const check = row.querySelector(".check");
@@ -424,12 +449,13 @@ function queueSave(dateKey, delay=220){
 async function saveDay(dateKey){
   if(!db) return;
   try{
-    const todos = readCardTodos(dateKey);
+    const todos = compactAndSortTodos(readCardTodos(dateKey));
     await setDoc(doc(db, collectionName(), profileDayKey(dateKey)), {
       todos,
       updatedAt: Date.now()
     }, {merge:true});
     latestTodosByDay.set(dateKey, todos);
+    applyTodos(dateKey, todos);
     setStatus("online","Live");
   }catch(err){
     console.error(err);
@@ -542,8 +568,8 @@ async function rolloverOneDay(sourceDateKey){
     // Schutz gegen doppeltes Verschieben desselben Tages.
     if(sourceData.rolloverDoneTo === targetDateKey) return;
 
-    const source = normalizeTodos(sourceData.todos);
-    const target = normalizeTodos(targetSnap.exists() ? targetSnap.data().todos : []);
+    const source = compactAndSortTodos(sourceData.todos);
+    const target = compactAndSortTodos(targetSnap.exists() ? targetSnap.data().todos : []);
 
     const candidates = source
       .map((todo, index) => ({todo, index}))
@@ -581,13 +607,16 @@ async function rolloverOneDay(sourceDateKey){
       movedCount++;
     });
 
+    const compactTarget = compactAndSortTodos(target);
+    const compactSource = compactAndSortTodos(source);
+
     transaction.set(targetRef, {
-      todos: target,
+      todos: compactTarget,
       updatedAt: now
     }, {merge:true});
 
     transaction.set(sourceRef, {
-      todos: source,
+      todos: compactSource,
       // Nur als vollständig erledigt markieren, wenn alle Kandidaten Platz hatten.
       rolloverDoneTo: transferable.length === candidates.length ? targetDateKey : "",
       rolloverCheckedAt: now,
@@ -708,9 +737,19 @@ async function start(){
         doc(db, collectionName(), profileDayKey(info.key)),
         snap => {
           const todos = snap.exists() ? snap.data().todos : emptyTodos();
-          latestTodosByDay.set(info.key, todos);
-          applyTodos(info.key, todos);
+          const compactedTodos = compactAndSortTodos(todos);
+          latestTodosByDay.set(info.key, compactedTodos);
+          applyTodos(info.key, compactedTodos);
           setStatus("online","Live");
+
+          const originalJson = JSON.stringify(normalizeTodos(todos));
+          const compactedJson = JSON.stringify(compactedTodos);
+          if(originalJson !== compactedJson){
+            setDoc(doc(db, collectionName(), profileDayKey(info.key)), {
+              todos: compactedTodos,
+              updatedAt: Date.now()
+            }, {merge:true}).catch(console.error);
+          }
 
           if(firstSnapshotsLeft > 0){
             firstSnapshotsLeft--;
