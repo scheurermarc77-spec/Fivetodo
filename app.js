@@ -43,8 +43,12 @@ let initialized = false;
 let midnightTimer = null;
 let overdueBanner = null;
 
-function lastSeenKey(){
-  return `fivetodo_last_seen_at_v3_${currentProfile || "none"}`;
+function lastSeenKey(profile=currentProfile){
+  return `fivetodo_last_seen_at_v4_${profile || "none"}`;
+}
+
+function completedSeenKey(profile){
+  return `fivetodo_completed_seen_at_v1_${profile}`;
 }
 
 function collectionName(){
@@ -225,6 +229,42 @@ function injectOverdueStyles(){
       animation:none;
     }
     .todo-row.done.is-overdue::after{display:none}
+    .profile-button,
+    [data-profile]{
+      position:relative;
+      overflow:visible;
+    }
+    .profile-new-badge,
+    .profile-done-badge{
+      position:absolute;
+      min-width:23px;
+      height:23px;
+      padding:0 6px;
+      border-radius:999px;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      font-size:12px;
+      font-weight:950;
+      line-height:1;
+      color:#fff;
+      border:2px solid rgba(255,255,255,.92);
+      box-shadow:0 5px 14px rgba(0,0,0,.28);
+      pointer-events:none;
+      z-index:4;
+    }
+    .profile-new-badge{
+      top:-8px;
+      right:-8px;
+      background:#ef4444;
+    }
+    .profile-done-badge{
+      right:-8px;
+      bottom:-8px;
+      background:#22c55e;
+    }
+    .profile-new-badge[hidden],
+    .profile-done-badge[hidden]{display:none!important}
   `;
   document.head.appendChild(style);
 }
@@ -255,6 +295,104 @@ function showOverdueBanner(count){
     ? "1 Aufgabe ist verspätet und wurde auf heute übertragen"
     : `${count} Aufgaben sind verspätet und wurden auf heute übertragen`;
   banner.hidden = false;
+}
+
+
+function ensureProfileBadges(){
+  document.querySelectorAll("[data-profile]").forEach(button => {
+    if(!button.querySelector(".profile-new-badge")){
+      const red = document.createElement("span");
+      red.className = "profile-new-badge";
+      red.hidden = true;
+      red.setAttribute("aria-label","Neue Aufgaben");
+      button.appendChild(red);
+    }
+    if(!button.querySelector(".profile-done-badge")){
+      const green = document.createElement("span");
+      green.className = "profile-done-badge";
+      green.hidden = true;
+      green.setAttribute("aria-label","Neu erledigte Aufgaben");
+      button.appendChild(green);
+    }
+  });
+}
+
+function profileName(profile){
+  return ({leon:"Leon",anouk:"Anouk",mami:"Mami",papi:"Papi"})[profile] || profile;
+}
+
+function profileDayKeyFor(profile, dateKey){
+  if(profile === "anouk") return `anouk_${dateKey}`;
+  if(profile === "mami") return `mami_${dateKey}`;
+  if(profile === "papi") return `papi_${dateKey}`;
+  return dateKey;
+}
+
+async function getProfileOverviewCounts(profile){
+  if(!db) return {newCount:0, doneCount:0};
+
+  const newSince = Number(localStorage.getItem(lastSeenKey(profile)) || 0);
+  const doneSince = Number(localStorage.getItem(completedSeenKey(profile)) || newSince || 0);
+
+  let newCount = 0;
+  let doneCount = 0;
+
+  // Überblick über die sichtbaren/relevanten Tage.
+  for(const info of getDayInfo()){
+    try{
+      const snap = await getDoc(doc(db, collectionName(), profileDayKeyFor(profile, info.key)));
+      if(!snap.exists()) continue;
+
+      const todos = normalizeTodos(snap.data().todos);
+      for(const todo of todos){
+        if(!todo.text.trim()) continue;
+
+        if(!todo.done && todo.createdAt > 0 && todo.createdAt > newSince){
+          newCount++;
+        }
+
+        if(todo.done && todo.completedAt > 0 && todo.completedAt > doneSince){
+          doneCount++;
+        }
+      }
+    }catch(err){
+      console.error("Übersicht konnte nicht gelesen werden:", profile, err);
+    }
+  }
+
+  return {newCount, doneCount};
+}
+
+async function refreshProfileOverviewBadges(){
+  ensureProfileBadges();
+  if(!db) return;
+
+  const profiles = ["leon","anouk","mami","papi"];
+  for(const profile of profiles){
+    const button = document.querySelector(`[data-profile="${profile}"]`);
+    if(!button) continue;
+
+    const {newCount, doneCount} = await getProfileOverviewCounts(profile);
+    const red = button.querySelector(".profile-new-badge");
+    const green = button.querySelector(".profile-done-badge");
+
+    if(red){
+      red.textContent = newCount > 99 ? "99+" : String(newCount);
+      red.hidden = newCount <= 0;
+      red.title = `${newCount} neue Aufgabe${newCount === 1 ? "" : "n"}`;
+    }
+    if(green){
+      green.textContent = doneCount > 99 ? "99+" : String(doneCount);
+      green.hidden = doneCount <= 0;
+      green.title = `${doneCount} neu erledigte Aufgabe${doneCount === 1 ? "" : "n"}`;
+    }
+  }
+}
+
+function markProfileOverviewSeen(profile){
+  const now = Date.now();
+  localStorage.setItem(lastSeenKey(profile), String(now));
+  localStorage.setItem(completedSeenKey(profile), String(now));
 }
 
 function showBravo(){
@@ -342,7 +480,10 @@ function readLastSeen(){
 }
 
 function markCurrentMomentSeen(){
-  localStorage.setItem(lastSeenKey(), String(Date.now()));
+  if(!currentProfile) return;
+  const now = Date.now();
+  localStorage.setItem(lastSeenKey(), String(now));
+  localStorage.setItem(completedSeenKey(currentProfile), String(now));
 }
 
 function getNewTaskKeysSince(lastSeen){
@@ -727,6 +868,9 @@ async function start(){
     db = getFirestore(firebaseApp);
     setStatus("","Verbinde…");
 
+    // Personenübersicht mit neuen/erledigten Aufgaben aktualisieren.
+    await refreshProfileOverviewBadges();
+
     // Zuerst fällige Aufgaben verschieben, erst danach Live-Listener aufbauen.
     await rolloverMissedDays();
 
@@ -805,6 +949,16 @@ function resetForProfile(){
 
 function chooseProfile(profile){
   currentProfile = profile;
+  markProfileOverviewSeen(profile);
+
+  const selectedButton = document.querySelector(`[data-profile="${profile}"]`);
+  if(selectedButton){
+    const red = selectedButton.querySelector(".profile-new-badge");
+    const green = selectedButton.querySelector(".profile-done-badge");
+    if(red) red.hidden = true;
+    if(green) green.hidden = true;
+  }
+
   resetForProfile();
 
   document.body.classList.toggle("profile-anouk", profile === "anouk");
@@ -834,6 +988,26 @@ document.querySelectorAll("[data-author]").forEach(button => {
 });
 
 ensureAuthor();
+ensureProfileBadges();
+
+async function initOverviewOnly(){
+  injectOverdueStyles();
+  ensureProfileBadges();
+
+  if(!firebaseLooksConfigured()) return;
+
+  try{
+    if(!firebaseApp){
+      firebaseApp = initializeApp(window.FIREBASE_CONFIG);
+    }
+    db = getFirestore(firebaseApp);
+    await refreshProfileOverviewBadges();
+  }catch(err){
+    console.error("Übersicht konnte nicht geladen werden:", err);
+  }
+}
+
+initOverviewOnly();
 
 bravoEl.addEventListener("click", () => {
   bravoEl.classList.remove("show");
@@ -844,11 +1018,12 @@ document.querySelectorAll("[data-profile]").forEach(button => {
   button.addEventListener("click", () => chooseProfile(button.dataset.profile));
 });
 
-changeProfileBtn.addEventListener("click", () => {
+changeProfileBtn.addEventListener("click", async () => {
   currentProfile = null;
   resetForProfile();
   appView.hidden = true;
   profileChooser.hidden = false;
   window.scrollTo({top:0,left:0,behavior:"instant"});
   document.body.classList.remove("profile-anouk");
+  await refreshProfileOverviewBadges();
 });

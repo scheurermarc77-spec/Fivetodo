@@ -1,12 +1,12 @@
-FiveTodo – Listen beim Öffnen automatisch aufräumen
+FiveTodo – Zähler in der Personenübersicht
 
 NEU
-- Jede Tagesliste wird beim Öffnen automatisch ohne Lücken angeordnet.
-- Ganz oben stehen offene Aufgaben, die vom Vortag übernommen wurden.
-- Danach folgen die übrigen offenen Aufgaben.
-- Danach folgen erledigte Aufgaben.
-- Leere Felder werden immer ganz nach unten verschoben.
-- Die aufgeräumte Reihenfolge wird auch in Firestore gespeichert.
+- Beim Start erscheinen direkt an jedem Namen kleine Zähler:
+  - Rot oben rechts = neue offene Aufgaben seit dem letzten Öffnen dieser Person.
+  - Grün unten rechts = neu erledigte Aufgaben seit dem letzten Öffnen dieser Person.
+- Die Zähler sitzen wie kleine Symbole am Namen und verdecken den Text nicht.
+- Sobald die betreffende Person geöffnet wird, werden beide Zähler für diese Person als gesehen markiert und ausgeblendet.
+- Beim Zurückkehren zur Personenübersicht werden die Zähler neu geladen.
 
 UPLOAD
 In GitHub nur die bestehende app.js durch diese neue app.js ersetzen und Commit changes bestätigen.
